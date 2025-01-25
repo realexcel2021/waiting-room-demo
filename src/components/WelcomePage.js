@@ -13,7 +13,7 @@ const WelcomePage = ({ auth, vwrToken, tokenExpiryInSeconds }) => {
   const expiryDate = new Date(Date.now() + tokenExpiryInSeconds * 1000).toLocaleString();
 
   const fetchUsers = () => {
-    axios.get('http://localhost:8084/', {
+    axios.get('http://18.134.133.67/', {
       headers: {
         Authorization: `Bearer ${vwrToken}`
       }
@@ -35,7 +35,7 @@ const WelcomePage = ({ auth, vwrToken, tokenExpiryInSeconds }) => {
     const newUser = { name, email, password };
 
     // Post new user to the server
-    axios.post('http://localhost:8084/', newUser, {
+    axios.post('http://18.134.133.67/', newUser, {
       headers: {
         Authorization: `Bearer ${vwrToken}`
       }
