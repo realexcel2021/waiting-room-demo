@@ -1,5 +1,5 @@
 # Use the official Node.js image as the base image
-FROM node:20-alpine as builder
+FROM node:21-alpine AS builder
 
 # Set the working directory
 WORKDIR /app
@@ -16,14 +16,9 @@ COPY . .
 # Build the React application
 RUN npm run build
 
-# Use the official Nginx image to serve the React application
-FROM nginx:alpine
+# No need for nginx image anymore, we'll use the same node image
+# Expose the port your Node.js server will use (typically 3000 or similar)
+EXPOSE 3000
 
-# Copy the build output to the Nginx html directory
-COPY --from=builder /app/build /usr/share/nginx/html
-
-# Expose port 80
-EXPOSE 80
-
-# Start Nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Start the Node.js server
+CMD ["npm", "start"]

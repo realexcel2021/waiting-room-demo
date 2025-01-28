@@ -8,33 +8,46 @@ const WaitingRoom = ({ auth, setVwarToken, setVwarTokenExpiresIn }) => {
   const [totalUsers, setTotalUsers] = useState(null);
   const [estimatedTime, setEstimatedTime] = useState(null);
   const [eventId, setEventId] = useState(null);
-  const [isFirstInQueue, setIsFirstInQueue] = useState(true); // Start optimistically
+  const [isFirstInQueue, setIsFirstInQueue] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   const enterQueue = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get('http://18.134.133.67/assign_queue_number');
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/assign_queue_number`);
       const event_id = response.data.data.api_request_id;
       setEventId(event_id);
 
       // Retrieve queue position using the event ID
-      const queueResponse = await axios.get(`http://18.134.133.67/check_queue_number?request_id=${event_id}`);
-      const queue_position = queueResponse.data.queue_number;
-      if (queueResponse.data.token.access_token !== undefined) {
-        setVwarToken(queueResponse.data.token.access_token);
-        setVwarTokenExpiresIn(queueResponse.data.token.expires_in);
-      } else {
-        setIsFirstInQueue(false); // Only set to false when we know user isn't first
-        setPosition(queue_position);
-      }  
-      const total_users = await axios.get('http://18.134.133.67/waiting_num');
-      setTotalUsers(total_users.data.waiting_number);
-      setEstimatedTime(queue_position * 2); // Assuming each position takes 2 seconds
+      await axios.get(`${process.env.REACT_APP_API_URL}/check_queue_number?request_id=${event_id}`)
+        .then(queueResponse => {
+          if (queueResponse.data.token && queueResponse.data.token.access_token) {
+            setVwarToken(queueResponse.data.token.access_token);
+            setVwarTokenExpiresIn(queueResponse.data.token.expires_in);
+            setIsFirstInQueue(true);
+          } else {
+            setIsFirstInQueue(false);
+            const queue_position = queueResponse.data.queue_number;
+            setPosition(queue_position);
+            
+            const total_users = axios.get(`${process.env.REACT_APP_API_URL}/waiting_num`)
+              .then(totalUsersResponse => {
+                setTotalUsers(totalUsersResponse.data.waiting_number);
+                setEstimatedTime(queue_position * 2);
+              })
+              .catch(error => {
+                console.error('Error getting total users:', error);
+              });
+          }
+        })
+        .catch(error => {
+          console.error('Error checking queue position:', error);
+          setIsFirstInQueue(false);
+        });
     } catch (error) {
       console.error('Error entering queue:', error);
-      setIsFirstInQueue(false); // Set to false on error
+      setIsFirstInQueue(false);
     } finally {
       setIsLoading(false);
     }
@@ -44,26 +57,26 @@ const WaitingRoom = ({ auth, setVwarToken, setVwarTokenExpiresIn }) => {
     if (eventId !== null) {
       const interval = setInterval(async () => {
         try {
-          const queueResponse = await axios.get(`http://18.134.133.67/check_queue_number?request_id=${eventId}`);
-          const total_users = await axios.get('http://18.134.133.67/waiting_num');
-          const queue_position = queueResponse.data.queue_number;
+          const queueResponse = await axios.get(`${process.env.REACT_APP_API_URL}/check_queue_number?request_id=${eventId}`);
+          const total_users = await axios.get(`${process.env.REACT_APP_API_URL}/waiting_num`);
           
           setTotalUsers(total_users.data.waiting_number);
           
-          if (queueResponse.data.token.access_token !== undefined && queueResponse.data.token.access_token !== null && queueResponse.data.token.access_token !== '' ) {
+          if (queueResponse.data.token && queueResponse.data.token.access_token) {
             setVwarToken(queueResponse.data.token.access_token);
             setVwarTokenExpiresIn(queueResponse.data.token.expires_in);
-            clearInterval(interval); // Stop the interval if a token is returned
+            clearInterval(interval);
           } else {
-            setIsFirstInQueue(false); // Only set to false when we know user isn't first
+            setIsFirstInQueue(false);
+            const queue_position = queueResponse.data.queue_number;
             setPosition(queue_position);
-            setEstimatedTime(queue_position * 2); // Assuming each position takes 2 seconds
+            setEstimatedTime(queue_position * 2);
           }
         } catch (error) {
           console.error('Error checking queue position:', error);
-          setIsFirstInQueue(false); // Set to false on error
+          setIsFirstInQueue(false);
         }
-      }, 1000); // Wait for 10 seconds before making another request
+      }, 5000);
       return () => clearInterval(interval);
     }
   }, [eventId]);
@@ -89,7 +102,6 @@ const WaitingRoom = ({ auth, setVwarToken, setVwarTokenExpiresIn }) => {
               <>
                 <p>Your current position in the queue: {position}</p>
                 <p>Total number of users in the queue: {totalUsers}</p>
-                <p>Estimated time to leave the queue: {estimatedTime} seconds</p>
               </>
           ) : (
             <p>You can now proceed from the queue.</p>
